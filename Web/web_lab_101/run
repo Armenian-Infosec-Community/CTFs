@@ -1,0 +1,6 @@
+docker run --rm -it \
+  -p 127.0.0.1:8000:8000 \
+  -v "$PWD":"$PWD" \
+  -w "$PWD" \
+  php:8.4-cli \
+  php -S 0.0.0.0:8000
