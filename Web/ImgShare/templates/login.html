@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImgShare - Login</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .login-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .floating-shapes {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        .shape {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        .shape:nth-child(1) {
+            width: 80px;
+            height: 80px;
+            top: 20%;
+            left: 10%;
+            animation-delay: 0s;
+        }
+        
+        .shape:nth-child(2) {
+            width: 60px;
+            height: 60px;
+            top: 60%;
+            right: 10%;
+            animation-delay: 2s;
+        }
+        
+        .shape:nth-child(3) {
+            width: 100px;
+            height: 100px;
+            bottom: 20%;
+            left: 20%;
+            animation-delay: 4s;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+        
+        .login-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .demo-accounts {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <!-- Floating Background Shapes -->
+    <div class="floating-shapes">
+        <div class="shape"></div>
+        <div class="shape"></div>
+        <div class="shape"></div>
+    </div>
+
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-logo">
+                <h1>
+                    <i class="fas fa-camera"></i> 
+                    ImgShare
+                </h1>
+                <p>Welcome back! Please sign in to your account</p>
+            </div>
+            
+            <!-- Flash Messages -->
+<!-- Replace the flash message section in login.html with: -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        {% if category == "error" %}
+                            <div class="alert alert-error">
+                                <i class="fas fa-exclamation-circle"></i>
+                                {{ message }}
+                            </div>
+                        {% else %}
+                            <div class="alert alert-success">
+                                <i class="fas fa-check-circle"></i>
+                                {{ message }}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <form method="post" id="loginForm">
+                <div style="position: relative; margin-bottom: 1rem;">
+                    <i class="fas fa-user" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                    <input type="text" name="username" class="form-control" 
+                           style="padding-left: 3rem;"
+                           placeholder="Username" required>
+                </div>
+                
+                <div style="position: relative; margin-bottom: 1.5rem;">
+                    <i class="fas fa-lock" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                    <input type="password" name="password" class="form-control" 
+                           style="padding-left: 3rem;"
+                           placeholder="Password" required>
+                </div>
+                
+                <button type="submit" class="btn" style="width: 100%; justify-content: center;">
+                    <i class="fas fa-sign-in-alt"></i> 
+                    Sign In
+                </button>
+            </form>
+            
+            <div class="demo-accounts">
+                <strong><i class="fas fa-info-circle"></i> Demo Accounts</strong>
+                <div style="margin-top: 0.75rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; text-align: center;">
+                    <div style="cursor: pointer; padding: 0.5rem; background: rgba(255, 255, 255, 0.3); border-radius: 0.5rem; transition: var(--transition);" 
+                         onclick="fillCredentials('admin', 'admin123')"
+                         onmouseover="this.style.background='rgba(255, 255, 255, 0.5)'"
+                         onmouseout="this.style.background='rgba(255, 255, 255, 0.3)'">
+                        <div style="font-weight: 600;">Admin</div>
+                        <small style="opacity: 0.8;">admin / admin123</small>
+                    </div>
+                    <div style="cursor: pointer; padding: 0.5rem; background: rgba(255, 255, 255, 0.3); border-radius: 0.5rem; transition: var(--transition);" 
+                         onclick="fillCredentials('user', 'password')"
+                         onmouseover="this.style.background='rgba(255, 255, 255, 0.5)'"
+                         onmouseout="this.style.background='rgba(255, 255, 255, 0.3)'">
+                        <div style="font-weight: 600;">User</div>
+                        <small style="opacity: 0.8;">user / password</small>
+                    </div>
+                </div>
+                <p style="margin-top: 1rem; font-size: 0.8rem; opacity: 0.8; text-align: center;">
+                    Click on a demo account to auto-fill credentials
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-fill credentials function
+        function fillCredentials(username, password) {
+            document.querySelector('input[name="username"]').value = username;
+            document.querySelector('input[name="password"]').value = password;
+            
+            // Add visual feedback
+            const form = document.getElementById('loginForm');
+            form.style.transform = 'scale(1.02)';
+            setTimeout(() => {
+                form.style.transform = 'scale(1)';
+            }, 150);
+        }
+
+        // Enhanced form interactions
+        document.addEventListener('DOMContentLoaded', function() {
+            const inputs = document.querySelectorAll('.form-control');
+            
+            inputs.forEach(input => {
+                input.addEventListener('focus', function() {
+                    this.parentElement.style.transform = 'translateY(-2px)';
+                });
+                
+                input.addEventListener('blur', function() {
+                    this.parentElement.style.transform = 'translateY(0)';
+                });
+                
+                // Add typing animation
+                input.addEventListener('input', function() {
+                    const icon = this.parentElement.querySelector('i');
+                    if (icon) {
+                        icon.style.color = 'var(--primary)';
+                        icon.style.transform = 'translateY(-50%) scale(1.1)';
+                        
+                        setTimeout(() => {
+                            icon.style.transform = 'translateY(-50%) scale(1)';
+                        }, 150);
+                    }
+                });
+            });
+
+            // Form submission with loading state
+            document.getElementById('loginForm').addEventListener('submit', function(e) {
+                const submitBtn = this.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
+                
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
+                submitBtn.disabled = true;
+                
+                // Re-enable button after 10 seconds as fallback
+                setTimeout(() => {
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }, 10000);
+            });
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                // Alt + 1 for admin credentials
+                if (e.altKey && e.key === '1') {
+                    e.preventDefault();
+                    fillCredentials('admin', 'admin123');
+                }
+                // Alt + 2 for user credentials
+                if (e.altKey && e.key === '2') {
+                    e.preventDefault();
+                    fillCredentials('user', 'password');
+                }
+            });
+
+            // Auto-dismiss alerts
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                setTimeout(() => {
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-10px)';
+                    setTimeout(() => {
+                        if (alert.parentNode) {
+                            alert.remove();
+                        }
+                    }, 300);
+                }, 5000);
+            });
+        });
+    </script>
+</body>
+</html>
