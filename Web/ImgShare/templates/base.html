@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ImgShare - Level {{ LEVEL }} Challenge{% endblock %}</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    
+    <!-- Meta tags for better sharing -->
+    <meta name="description" content="ImgShare - A modern image sharing platform">
+    <meta name="author" content="ImgShare">
+    
+    <!-- Open Graph tags for social media sharing -->
+    {% block meta_tags %}
+    <meta property="og:title" content="{% block og_title %}ImgShare{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Share and discover beautiful images{% endblock %}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ request.url }}">
+    {% endblock %}
+</head>
+<body>
+    {% block navbar %}
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">
+                <i class="fas fa-camera"></i> ImgShare
+                <span class="level-badge">Level {{ LEVEL }}</span>
+            </a>
+            <div class="nav-menu">
+                {% if session.user %}
+                    <span class="nav-link">Welcome, {{ session.user }}!</span>
+                    <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    {% endblock %}
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Global Scripts -->
+    {% block scripts %}
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Enhanced image loading with better UX
+        const images = document.querySelectorAll('img[src*="data:image"]');
+        images.forEach(img => {
+            img.addEventListener('loadstart', function() {
+                this.style.opacity = '0.7';
+                this.style.transition = 'opacity 0.3s ease';
+            });
+            
+            img.addEventListener('load', function() {
+                this.style.opacity = '1';
+            });
+            
+            img.addEventListener('error', function() {
+                console.warn('Image failed to load:', this.src.substring(0, 100) + '...');
+            });
+        });
+
+        // Smooth scroll behavior for navigation
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Enhanced button interactions - simplified to avoid form submission issues
+        const buttons = document.querySelectorAll('.btn:not([type="submit"])');
+        buttons.forEach(button => {
+            // Only add effects to non-submit buttons to avoid interfering with form submission
+            button.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-1px)';
+            });
+            
+            button.addEventListener('mouseleave', function() {
+                this.style.transform = '';
+            });
+        });
+
+        // Auto-dismiss alerts after 5 seconds
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            setTimeout(() => {
+                alert.style.opacity = '0';
+                alert.style.transform = 'translateY(-10px)';
+                setTimeout(() => {
+                    alert.remove();
+                }, 300);
+            }, 5000);
+        });
+
+        // Photo card hover effects
+        const photoCards = document.querySelectorAll('.photo-card');
+        photoCards.forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-8px) scale(1.02)';
+            });
+            
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = '';
+            });
+        });
+
+        // Lazy loading for images
+        if ('IntersectionObserver' in window) {
+            const imageObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        if (img.dataset.src) {
+                            img.src = img.dataset.src;
+                            img.removeAttribute('data-src');
+                            observer.unobserve(img);
+                        }
+                    }
+                });
+            });
+
+            document.querySelectorAll('img[data-src]').forEach(img => {
+                imageObserver.observe(img);
+            });
+        }
+    });
+
+    // Utility function for notifications
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type}`;
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+            ${message}
+        `;
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.zIndex = '1000';
+        notification.style.maxWidth = '400px';
+        notification.style.boxShadow = 'var(--shadow-xl)';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 300);
+        }, 4000);
+    }
+
+    // Global error handling
+    window.addEventListener('error', function(e) {
+        console.error('Global error:', e.error);
+        // Don't show notifications for image loading errors
+        if (!e.filename || !e.filename.includes('data:image')) {
+            // Uncomment for debugging: showNotification('An error occurred. Please try again.', 'error');
+        }
+    });
+    </script>
+    {% endblock %}
+</body>
+</html>

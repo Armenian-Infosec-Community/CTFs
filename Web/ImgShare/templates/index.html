@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                {% if "error" in message.lower() %}
+                    <div class="alert alert-error">
+                        <i class="fas fa-exclamation-circle"></i>
+                        {{ message }}
+                    </div>
+                {% else %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i>
+                        {{ message }}
+                    </div>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Upload Section -->
+    <div class="upload-section">
+        <h2><i class="fas fa-cloud-upload-alt"></i> Share Your Images</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 1rem;">
+            Upload and resize images from any URL. Images will be automatically resized to create beautiful thumbnails.
+        </p>
+        <form method="post" action="/upload">
+            <input type="text" name="image_url" class="form-control" 
+                   placeholder="Enter image URL (e.g., https://example.com/image.jpg)" required>
+            <input type="text" name="title" class="form-control" 
+                   placeholder="Give your image a title" required>
+            <textarea name="description" class="form-control" rows="3" 
+                      placeholder="Add a description to tell others about your image (optional)"></textarea>
+            <button type="submit" class="btn">
+                <i class="fas fa-magic"></i> Process & Upload
+            </button>
+        </form>
+    </div>
+
+    <!-- Photos Grid -->
+    <div class="photo-grid">
+        {% if photos %}
+            {% for photo in photos %}
+                <div class="photo-card" onclick="window.location.href='/image/{{ photo.id }}'">
+                    <img src="{{ photo.thumbnail }}" alt="{{ photo.title }}" 
+                         loading="lazy"
+                         onerror="this.outerHTML='<div class=\\'broken-image\\'><i class=\\'fas fa-image\\'></i><small>Image failed to load</small></div>'">
+                    <div class="photo-info">
+                        <h4>{{ photo.title }}</h4>
+                        <p>{{ photo.description or 'No description provided' }}</p>
+                        <small>
+                            <span><i class="fas fa-user"></i> {{ photo.user }}</span>
+                            <span><i class="fas fa-calendar-alt"></i> {{ photo.uploaded }}</span>
+                            <span><i class="fas fa-eye"></i> {{ photo.views }}</span>
+                        </small>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div style="grid-column: 1 / -1; text-align: center; padding: 4rem; color: var(--text-muted);">
+                <div style="background: var(--bg-card); padding: 3rem; border-radius: 1rem; box-shadow: var(--shadow); border: 1px solid var(--border);">
+                    <i class="fas fa-images" style="font-size: 4rem; margin-bottom: 1.5rem; opacity: 0.6; color: var(--primary-light);"></i>
+                    <h3 style="color: var(--text-primary); margin-bottom: 1rem;">No images shared yet</h3>
+                    <p style="margin-bottom: 2rem;">Be the first to share an image! Use the upload form above to get started.</p>
+                    <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                        <span style="padding: 0.5rem 1rem; background: var(--bg-tertiary); border-radius: 2rem; font-size: 0.875rem; color: var(--text-secondary);">
+                            <i class="fas fa-link"></i> Paste any image URL
+                        </span>
+                        <span style="padding: 0.5rem 1rem; background: var(--bg-tertiary); border-radius: 2rem; font-size: 0.875rem; color: var(--text-secondary);">
+                            <i class="fas fa-crop"></i> Auto-resize to thumbnails
+                        </span>
+                        <span style="padding: 0.5rem 1rem; background: var(--bg-tertiary); border-radius: 2rem; font-size: 0.875rem; color: var(--text-secondary);">
+                            <i class="fas fa-share-alt"></i> Share with others
+                        </span>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
