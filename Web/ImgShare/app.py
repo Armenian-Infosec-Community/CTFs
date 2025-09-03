@@ -41,38 +41,158 @@ def ensure_flag_file():
 
 ensure_flag_file()
 
+import socket
+import struct
+import ipaddress
+import re
+
 def is_local(hostname):
     if not hostname:
         return False
+    
     hostname = hostname.lower().strip()
     
-    local_hosts = {'localhost', '127.0.0.1', '0.0.0.0', '::1'}
-    if hostname in local_hosts:
+    hostname = hostname.strip('[]')
+    
+    localhost_variants = {
+        'localhost', 'localhost.localdomain', 'localhost.local',
+        '127.0.0.1', '127.1', '127.0.1', '0127.0.0.1', '0x7f.0.0.1',
+        '::1', '0:0:0:0:0:0:0:1', '0000:0000:0000:0000:0000:0000:0000:0001',
+        '0.0.0.0', '0', '0.0', '0.0.0', '000.000.000.000',
+        'local', 'localdomain', 'home',
+        '2130706433',
+        '0x7f000001',
+        '017700000001',
+    }
+    
+    if hostname in localhost_variants:
         return True
     
-    if hostname.startswith(('192.168.', '10.', '172.')):
-        return True
+    localhost_patterns = [
+        r'^localhost\..*',
+        r'.*\.localhost$',
+        r'^.*\.local$',
+        r'^.*\.localdomain$',
+        r'^test$',
+        r'^example$',
+        r'^invalid$',
+    ]
+    
+    for pattern in localhost_patterns:
+        if re.match(pattern, hostname):
+            return True
     
     try:
-        if hostname.startswith('0x'):
-            ip = socket.inet_ntoa(struct.pack('!I', int(hostname, 16)))
-            if ip.startswith(('127.', '192.168.', '10.')) or ip == '0.0.0.0':
+        if hostname.isdigit():
+            ip_int = int(hostname)
+            if ip_int == 0 or (ip_int >> 24) == 127:
                 return True
+            try:
+                ip = socket.inet_ntoa(struct.pack('!I', ip_int))
+                return is_private_ip(ip)
+            except (struct.error, OSError):
+                pass
         
-        elif hostname.isdigit():
-            ip = socket.inet_ntoa(struct.pack('!I', int(hostname)))
-            if ip.startswith(('127.', '192.168.', '10.')) or ip == '0.0.0.0':
-                return True
+        elif hostname.startswith('0x'):
+            try:
+                ip_int = int(hostname, 16)
+                if ip_int == 0 or (ip_int >> 24) == 127:
+                    return True
+                ip = socket.inet_ntoa(struct.pack('!I', ip_int))
+                return is_private_ip(ip)
+            except (ValueError, struct.error, OSError):
+                pass
+        
+        elif hostname.startswith('0') and len(hostname) > 1 and all(c in '01234567' for c in hostname):
+            try:
+                ip_int = int(hostname, 8)
+                if ip_int == 0 or (ip_int >> 24) == 127:
+                    return True
+                ip = socket.inet_ntoa(struct.pack('!I', ip_int))
+                return is_private_ip(ip)
+            except (ValueError, struct.error, OSError):
+                pass
+        
+        elif '.' in hostname and any(part.startswith(('0x', '0')) for part in hostname.split('.')):
+            parts = hostname.split('.')
+            try:
+                ip_parts = []
+                for part in parts:
+                    if part.startswith('0x'):
+                        ip_parts.append(str(int(part, 16)))
+                    elif part.startswith('0') and len(part) > 1:
+                        ip_parts.append(str(int(part, 8)))
+                    else:
+                        ip_parts.append(part)
+                reconstructed_ip = '.'.join(ip_parts)
+                return is_private_ip(reconstructed_ip)
+            except (ValueError, IndexError):
+                pass
         
         else:
-            ip = socket.gethostbyname(hostname)
-            if ip.startswith(('127.', '192.168.', '10.')) or ip == '0.0.0.0':
-                return True
-                
-    except:
-        pass
+            try:
+                ip = socket.gethostbyname(hostname)
+                return is_private_ip(ip)
+            except socket.gaierror:
+                pass
+            
+            return is_private_ip(hostname)
+            
+    except Exception:
+        return True
     
     return False
+
+def is_private_ip(ip_str):
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        
+        if ip.is_loopback:
+            return True
+            
+        if ip.is_private:
+            return True
+            
+        if ip.is_link_local:
+            return True
+            
+        if ip.is_unspecified:
+            return True
+            
+        if ip.is_multicast:
+            return True
+            
+        if isinstance(ip, ipaddress.IPv4Address):
+            if str(ip).startswith('127.'):
+                return True
+            if str(ip).startswith('0.'):
+                return True
+                
+        elif isinstance(ip, ipaddress.IPv6Address):
+            if ip == ipaddress.IPv6Address('::1'):
+                return True
+            if str(ip).startswith('::'):
+                return True
+                
+        return False
+        
+    except (ipaddress.AddressValueError, ValueError):
+        return True
+
+if __name__ == "__main__":
+    test_cases = [
+        "localhost", "127.0.0.1", "127.1", "127.0.1", 
+        "::1", "0:0:0:0:0:0:0:1", "0.0.0.0",
+        "2130706433", "0x7f000001", "017700000001",
+        "0x7f.0.0.1", "0177.0.0.1", "localhost.localdomain",
+        "test.localhost", "app.local", "192.168.1.1",
+        "10.0.0.1", "172.16.0.1", "example.com",
+        "google.com", "0", "127", "0x7f", "0177"
+    ]
+    
+    for case in test_cases:
+        result = is_local(case)
+        print(f"{case:20} -> {'BLOCKED' if result else 'ALLOWED'}")
 
 def resize_image_from_url(url, target_width=300, target_height=200):
     print(f"[RESIZER] Processing URL: {url}")
