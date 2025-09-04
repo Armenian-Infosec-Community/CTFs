@@ -45,95 +45,203 @@ def is_local(hostname):
     if not hostname:
         return False
     hostname = hostname.lower().strip()
-    
-    local_hosts = {'localhost', '127.0.0.1', '0.0.0.0', '::1'}
-    if hostname in local_hosts:
+    hostname = hostname.strip('[]')
+
+    localhost_variants = {
+        'localhost', 'localhost.localdomain', 'localhost.local',
+        '127.0.0.1', '127.1', '127.0.1', '0127.0.0.1', '0x7f.0.0.1',
+        '::1', '0:0:0:0:0:0:0:1', '0000:0000:0000:0000:0000:0000:0000:0001',
+        '0.0.0.0', '0', '0.0', '0.0.0', '000.000.000.000',
+        'local', 'localdomain', 'home',
+        '2130706433',
+        '0x7f000001',
+        '017700000001',
+    }
+    if hostname in localhost_variants:
         return True
-    
-    if hostname.startswith(('192.168.', '10.', '172.')):
-        return True
-    
+
+    localhost_patterns = [
+        r'^localhost\..*',
+        r'.*\.localhost$',
+        r'^.*\.local$',
+        r'^.*\.localdomain$',
+        r'^test$',
+        r'^example$',
+        r'^invalid$',
+    ]
+    for pattern in localhost_patterns:
+        if re.match(pattern, hostname):
+            return True
+
     try:
-        if hostname.startswith('0x'):
-            ip = socket.inet_ntoa(struct.pack('!I', int(hostname, 16)))
-            if ip.startswith(('127.', '192.168.', '10.')) or ip == '0.0.0.0':
+        if hostname.isdigit():
+            ip_int = int(hostname)
+            if ip_int == 0 or (ip_int >> 24) == 127:
                 return True
-        
-        elif hostname.isdigit():
-            ip = socket.inet_ntoa(struct.pack('!I', int(hostname)))
-            if ip.startswith(('127.', '192.168.', '10.')) or ip == '0.0.0.0':
-                return True
-        
-        else:
-            ip = socket.gethostbyname(hostname)
-            if ip.startswith(('127.', '192.168.', '10.')) or ip == '0.0.0.0':
-                return True
-                
-    except:
-        pass
-    
+            try:
+                ip = socket.inet_ntoa(struct.pack('!I', ip_int))
+                return is_private_ip(ip)
+            except (struct.error, OSError):
+                pass
+        elif hostname.startswith('0x'):
+            try:
+                ip_int = int(hostname, 16)
+                if ip_int == 0 or (ip_int >> 24) == 127:
+                    return True
+                ip = socket.inet_ntoa(struct.pack('!I', ip_int))
+                return is_private_ip(ip)
+            except (ValueError, struct.error, OSError):
+                pass
+        elif hostname.startswith('0') and len(hostname) > 1 and all(c in '01234567' for c in hostname):
+            try:
+                ip_int = int(hostname, 8)
+                if ip_int == 0 or (ip_int >> 24) == 127:
+                    return True
+                ip = socket.inet_ntoa(struct.pack('!I', ip_int))
+                return is_private_ip(ip)
+            except (ValueError, struct.error, OSError):
+                pass
+        elif '.' in hostname:
+            parts = hostname.split('.')
+            try:
+                ip_parts = []
+                for part in parts:
+                    if part.startswith('0x'):
+                        ip_parts.append(str(int(part, 16)))
+                    elif part.startswith('0') and len(part) > 1 and all(c in '01234567' for c in part):
+                        ip_parts.append(str(int(part, 8)))
+                    elif part.isdigit():
+                        ip_parts.append(part)
+                    else:
+                        ip_parts.append(part)
+                reconstructed_ip = '.'.join(ip_parts)
+                if len(ip_parts) < 4 and all(part.isdigit() for part in ip_parts):
+                    try:
+                        if len(ip_parts) == 2:
+                            a, b = int(ip_parts[0]), int(ip_parts[1])
+                            if a == 127:
+                                return True
+                            full_ip = f"{a}.{(b >> 16) & 0xFF}.{(b >> 8) & 0xFF}.{b & 0xFF}"
+                            return is_private_ip(full_ip)
+                        elif len(ip_parts) == 3:
+                            a, b, c = int(ip_parts[0]), int(ip_parts[1]), int(ip_parts[2])
+                            if a == 127:
+                                return True
+                            full_ip = f"{a}.{b}.{(c >> 8) & 0xFF}.{c & 0xFF}"
+                            return is_private_ip(full_ip)
+                    except (ValueError, IndexError):
+                        pass
+                return is_private_ip(reconstructed_ip)
+            except (ValueError, IndexError):
+                pass
+        if not any([
+            '0x' in hostname,
+            hostname.startswith('0.'),
+            hostname.isdigit() and len(hostname) > 3,
+            re.match(r'^0[0-7]+$', hostname)
+        ]):
+            try:
+                ip = socket.gethostbyname(hostname)
+                return is_private_ip(ip)
+            except socket.gaierror:
+                pass
+        try:
+            return is_private_ip(hostname)
+        except (ipaddress.AddressValueError, ValueError):
+            pass
+    except Exception:
+        if any([
+            '0x' in hostname,
+            hostname.startswith('0.'),
+            hostname.isdigit() and len(hostname) > 3,
+            re.match(r'^0[0-7]+$', hostname) is not None
+        ]):
+            return True
     return False
+
+def is_private_ip(ip_str):
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        if ip.is_loopback:
+            return True
+        if ip.is_private:
+            return True
+        if ip.is_link_local:
+            return True
+        if ip.is_unspecified:
+            return True
+        if ip.is_multicast:
+            return True
+        if isinstance(ip, ipaddress.IPv4Address):
+            if str(ip).startswith('127.'):
+                return True
+            if str(ip).startswith('0.'):
+                return True
+        elif isinstance(ip, ipaddress.IPv6Address):
+            if ip == ipaddress.IPv6Address('::1'):
+                return True
+            if str(ip).startswith('::'):
+                return True
+        return False
+    except (ipaddress.AddressValueError, ValueError):
+        return True
+
+if __name__ == "__main__":
+    test_cases = [
+        "localhost", "127.0.0.1", "127.1", "127.0.1", 
+        "::1", "0:0:0:0:0:0:0:1", "0.0.0.0",
+        "2130706433", "0x7f000001", "017700000001",
+        "0x7f.0.0.1", "0177.0.0.1", "localhost.localdomain",
+        "test.localhost", "app.local", "192.168.1.1",
+        "10.0.0.1", "172.16.0.1", "example.com",
+        "google.com", "0", "127", "0x7f", "0177"
+    ]
+    for case in test_cases:
+        result = is_local(case)
+        print(f"{case:20} -> {'BLOCKED' if result else 'ALLOWED'}")
 
 def resize_image_from_url(url, target_width=300, target_height=200):
     print(f"[RESIZER] Processing URL: {url}")
-    
     try:
         parsed = urlparse(url)
     except Exception as e:
         raise ValueError(f"Invalid URL: {e}")
-
     if LEVEL == 1:
         if parsed.scheme not in ("http", "https"):
             raise ValueError("Only HTTP/HTTPS protocols allowed")
-
         try:
             session = requests.Session()
             resp = session.get(url, timeout=10, verify=False, allow_redirects=False)
-
             while resp.is_redirect or resp.status_code in (301, 302, 303, 307, 308):
                 redirect_url = resp.headers.get("Location")
                 if not redirect_url:
                     break
-
                 redirect_parsed = urlparse(redirect_url)
                 if redirect_parsed.hostname and redirect_parsed.hostname.lower() in ['localhost', '127.0.0.1']:
                     raise ValueError("Blocked local address in redirect chain")
-
                 resp = session.get(redirect_url, timeout=10, verify=False, allow_redirects=False)
-
             content = resp.content
-
         except Exception as e:
             raise ValueError(f"HTTP fetch failed: {e}")
-
     elif LEVEL == 2:
         if parsed.scheme not in ("http", "https"):
             raise ValueError(f"Only HTTP/HTTPS protocols allowed")
-
         if is_local(parsed.hostname):
             raise ValueError("Blocked local address in initial URL")
-
         try:
             session = requests.Session()
             resp = session.get(url, timeout=10, verify=False, allow_redirects=False)
-
             while resp.is_redirect or resp.status_code in [301, 302, 303, 307, 308]:
                 redirect_url = resp.headers.get('Location')
                 if not redirect_url:
                     break
-                
                 redirect_parsed = urlparse(redirect_url)
-                
                 if redirect_parsed.hostname and redirect_parsed.hostname.lower() in ['localhost', '127.0.0.1']:
                     raise ValueError("Blocked local address in redirect chain")
-                
                 resp = session.get(redirect_url, timeout=10, verify=False, allow_redirects=False)
-
             content = resp.content
-
         except Exception as e:
             raise ValueError(f"HTTP fetch failed: {e}")
-
     encoded_content = base64.b64encode(content).decode()
     return f"data:image/png;base64,{encoded_content}"
 
@@ -178,14 +286,12 @@ def redirect_service():
     target_url = request.args.get('url')
     if not target_url:
         return "Missing 'url' parameter", 400
-    
     return redirect(target_url, code=302)
 
 @app.route("/private/secret.txt", methods=["GET"])
 def private_secret():
     if request.remote_addr not in ['127.0.0.1', '::1']:
         return "Access denied: Internal endpoint only", 403
-    
     try:
         with open("/private/secret.txt", "r") as f:
             return f.read(), 200, {"Content-Type": "text/plain"}
@@ -201,14 +307,12 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
-        
         if username in users_db and users_db[username]["password"] == password:
             session["user"] = username
             flash(f"Welcome back, {username}!", "success")
             return redirect(url_for("index"))
         else:
             flash("Invalid credentials", "error")
-    
     return render_template('login.html')
 
 @app.route("/logout")
@@ -221,18 +325,14 @@ def logout():
 def view_image(image_id):
     if "user" not in session:
         return redirect(url_for("login"))
-    
     photo = next((p for p in photos_db if p["id"] == image_id), None)
     if not photo:
         abort(404)
-    
     photo["views"] += 1
-    
     current_index = next((i for i, p in enumerate(photos_db) if p["id"] == image_id), None)
     next_photo = None
     if current_index is not None and current_index < len(photos_db) - 1:
         next_photo = photos_db[current_index + 1]
-    
     return render_template('image_view.html', photo=photo, next_photo=next_photo, LEVEL=LEVEL)
 
 @app.route("/", methods=["GET", "POST"])
@@ -245,18 +345,14 @@ def index():
 def upload():
     if "user" not in session:
         return redirect(url_for("login"))
-    
     image_url = request.form.get("image_url", "").strip()
     title = request.form.get("title", "").strip()
     description = request.form.get("description", "").strip()
-    
     if not image_url or not title:
         flash("Image URL and title are required", "error")
         return redirect(url_for("index"))
-    
     try:
         thumbnail_data = resize_image_from_url(image_url)
-        
         new_photo = {
             "id": len(photos_db) + 1,
             "title": title,
@@ -267,14 +363,10 @@ def upload():
             "uploaded": datetime.now().strftime("%Y-%m-%d"),
             "views": 0
         }
-        
         photos_db.insert(0, new_photo)
-        
         flash("Image processed and uploaded successfully!", "success")
-            
     except Exception as e:
         flash(f"Upload failed: {str(e)}", "error")
-    
     return redirect(url_for("index"))
 
 if __name__ == "__main__":
