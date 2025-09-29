@@ -1,0 +1,23 @@
+services:
+  admin:
+    build: ./admin
+    networks:
+      internal:
+        ipv4_address: 10.10.0.10
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:5000"
+    networks:
+      internal:
+        ipv4_address: 10.10.0.11
+
+networks:
+  internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.0.0/16
+          gateway: 10.10.0.1
+
