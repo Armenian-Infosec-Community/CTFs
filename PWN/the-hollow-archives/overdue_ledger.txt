@@ -1,0 +1,6 @@
+OVERDUE LEDGER
+Fines accrue nightly. Payment is not accepted in coin.
+
+  Patron #0013 — overdue 41 years — book returned, desk never cleared
+  Patron #0027 — overdue 112 years — last seen in the Restricted Section
+  Patron #0000 — overdue forever — you, eventually
